@@ -1,5 +1,5 @@
 import { createResource } from "@/lib/actions/resources";
-import { createDocumentTitle, findRelevantContent } from "@/lib/ai/embedding";
+import { createDocumentTitle } from "@/lib/ai/embedding";
 import { getInformationWithStructRAG } from "@/lib/ai/struct-rag";
 import { openai } from "@ai-sdk/openai";
 import { generateObject, streamText, tool } from "ai";
