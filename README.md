@@ -1,3 +1,11 @@
+# References
+
+### Paper:
+StructRAG: Boosting Knowledge Intensive Reasoning of LLMs via Inference‑time Hybrid Information Structurization
+https://arxiv.org/abs/2410.08815
+
+Official StructRAG implementation: https://github.com/icip-cas/StructRAG
+
 # AI SDK StructRAG Template
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnicoalbanese%2Fai-sdk-rag-template&env=OPENAI_API_KEY&envDescription=You%20will%20need%20an%20OPENAI%20API%20Key.&project-name=ai-sdk-rag&repository-name=ai-sdk-rag&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D&skippable-integrations=1)
