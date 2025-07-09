@@ -12,7 +12,7 @@ const executeStructRAG = async (
   question: string,
 ): Promise<string> => {
   // TODO: validate the instructions work for all queries, or what exactly are the instructions
-  const instruction = await loadPrompt("instruction.txt");
+  const instruction = await loadPrompt("instruction");
   const query = `#Papers:\n......\n\n${instruction}\n\n#The paper you need to analyze:\n${question}`;
   const docs = await getTitleAndContent();
   const titles = docs.map((doc) => doc.title);

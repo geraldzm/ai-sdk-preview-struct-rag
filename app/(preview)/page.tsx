@@ -52,8 +52,6 @@ export default function Chat() {
     }
   }, [isLoading, currentToolCall, messages]);
 
-  console.log(awaitingResponse, currentToolCall);
-
   const userQuery: Message | undefined = messages
     .filter((m) => m.role === "user")
     .slice(-1)[0];

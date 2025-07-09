@@ -41,7 +41,7 @@ export async function POST(req: Request) {
           // Create a title for the content
           const title = await createDocumentTitle(content);
 
-          createResource({ title, content });
+          return createResource({ title, content });
         },
       }),
       getInformation: tool({
@@ -50,39 +50,14 @@ export async function POST(req: Request) {
           question: z.string().describe("the users question"),
         }),
         execute: async ({ question }) => {
-          // TODO: handle error case
-          const answer = await getInformationWithStructRAG(question);
-
-          return answer;
-        },
-      }),
-      understandQuery: tool({
-        description: `understand the users query. use this tool on every prompt.`,
-        parameters: z.object({
-          query: z.string().describe("the users query"),
-          toolsToCallInOrder: z
-            .array(z.string())
-            .describe(
-              "these are the tools you need to call in the order necessary to respond to the users query",
-            ),
-        }),
-        execute: async ({ query }) => {
-          const { object } = await generateObject({
-            model: openai("gpt-4o"),
-            system:
-              "You are a query understanding assistant. Analyze the user query and generate similar questions.",
-            schema: z.object({
-              questions: z
-                .array(z.string())
-                .max(3)
-                .describe("similar questions to the user's query. be concise."),
-            }),
-            prompt: `Analyze this query: "${query}". Provide the following:
-                    3 similar questions that could help answer the user's query`,
-          });
-
-          console.log("questions: ", object.questions);
-          return object.questions;
+          try {
+            const answer = await getInformationWithStructRAG(question);
+            console.log("the answer: ", answer);
+            return answer;
+          } catch (err) {
+            console.error("StructRAG failed:", err);
+          }
+          return "Sorry, I don't know.";
         },
       }),
     },

@@ -37,7 +37,6 @@ TITLE:
     }),
     prompt,
   });
-  console.log("here");
 
   return object.title;
 };
