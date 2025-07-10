@@ -2,7 +2,7 @@ import { createResource } from "@/lib/actions/resources";
 import { createDocumentTitle } from "@/lib/ai/embedding";
 import { getInformationWithStructRAG } from "@/lib/ai/struct-rag";
 import { openai } from "@ai-sdk/openai";
-import { generateObject, streamText, tool } from "ai";
+import { streamText, tool } from "ai";
 import { z } from "zod";
 
 // Allow streaming responses up to 30 seconds

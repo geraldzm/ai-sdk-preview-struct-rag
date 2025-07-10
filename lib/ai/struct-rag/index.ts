@@ -4,16 +4,14 @@ import path from "path";
 import { getTitleAndContent } from "@/lib/actions/resources";
 import { selectStructure } from "./router";
 import { construct } from "./structurizer";
-import { loadPrompt } from "../prompt-utils";
 import { decompose, extract, merge } from "./utilizer";
 
 const executeStructRAG = async (
   dir: string,
   question: string,
 ): Promise<string> => {
-  // TODO: validate the instructions work for all queries, or what exactly are the instructions
-  const instruction = await loadPrompt("instruction");
-  const query = `#Papers:\n......\n\n${instruction}\n\n#The paper you need to analyze:\n${question}`;
+  // TODO: In the original code, each question is wrapped in a `prompt_template`, and a specific instruction is added.
+  const query = question; // `#Papers:\n......\n\n${instruction}\n\n#The paper you need to analyze:\n${question}`;
   const docs = await getTitleAndContent();
   const titles = docs.map((doc) => doc.title);
 
