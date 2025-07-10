@@ -1,55 +1,52 @@
 import { generateText } from "ai";
 import { loadPrompt } from "../prompt-utils";
 import { openai } from "@ai-sdk/openai";
-import { writeFileToTmpDir } from "@/lib/file-utils";
 
 export const construct = async (
-  dir: string,
   query: string,
   chosen: "table" | "graph" | "algorithm" | "catalogue" | "chunk",
   docs: { title: string; content: string }[],
-): Promise<string> => {
+): Promise<{ truncatedKbInfo: string; kbInfo: string[] }> => {
   switch (chosen) {
     case "graph": {
       const instruction =
         "Based on the given document, construct a graph where entities are the titles of papers and the relation is 'reference', using the given document title as the head and other paper titles as tails.";
-      const info = await constructGraph(dir, instruction, docs);
-      return info;
+      const kb = await constructGraph(instruction, docs);
+      return kb;
     }
     case "table": {
       const instruction = `Query is ${query}, please extract relevant complete tables from the document based on the attributes and keywords mentioned in the Query. Note: retain table titles and source information.`;
-      const info = await constructTable(dir, instruction, docs);
-      return info;
+      const kb = await constructTable(instruction, docs);
+      return kb;
     }
     case "algorithm": {
       const instruction = `Query is ${query}, please extract relevant algorithms from the document based on the Query.`;
-      const info = await constructAlgorithm(dir, instruction, docs);
-      return info;
+      const kb = await constructAlgorithm(instruction, docs);
+      return kb;
     }
     case "catalogue": {
       const instruction = `Query is ${query}, please extract relevant catalogues from the document based on the Query.`;
-      const info = await constructCatalogue(dir, instruction, docs);
-      return info;
+      const kb = await constructCatalogue(instruction, docs);
+      return kb;
     }
     case "chunk": {
       // const instruction = "construct chunk";
-      const info = constructChunk(docs);
-      return info;
+      const kb = constructChunk(docs);
+      return kb;
     }
   }
 };
 
 const constructGraph = async (
-  dir: string,
   instruction: string,
   docs: { title: string; content: string }[],
-): Promise<string> => {
+): Promise<{ truncatedKbInfo: string; kbInfo: string[] }> => {
   console.log("constructGraph...");
 
   const systemPrompt = await loadPrompt("construct_graph");
-  let graphInfo = "";
+  let truncatedKbInfo = "";
 
-  const graphs: string[] = [];
+  const kbInfo: string[] = [];
   const titles = docs.map((d) => d.title).join("\n");
 
   for (const { title, content } of docs) {
@@ -67,24 +64,21 @@ const constructGraph = async (
         "Output:",
     });
 
-    graphs.push(`${title}: ${text}`);
-    graphInfo += text.split("\n", 1)[0].slice(0, 128);
+    kbInfo.push(`${title}: ${text}`);
+    truncatedKbInfo += text.split("\n", 1)[0].slice(0, 128);
   }
 
-  await writeFileToTmpDir(dir, "graphs.json", graphs);
-
-  return graphInfo;
+  return { truncatedKbInfo, kbInfo };
 };
 
 const constructTable = async (
-  dir: string,
   instruction: string,
   docs: { title: string; content: string }[],
-): Promise<string> => {
+): Promise<{ truncatedKbInfo: string; kbInfo: string[] }> => {
   console.log("constructTable...");
 
-  let info = "";
-  const tables: string[] = [];
+  let truncatedKbInfo = "";
+  const kbInfo: string[] = [];
 
   const systemPrompt = await loadPrompt("construct_table");
 
@@ -99,25 +93,22 @@ const constructTable = async (
         `${instruction}\n\n` +
         "Output:",
     });
-    tables.push(`${title}: ${text}`);
-    info += text.split("\n", 1)[0].slice(0, 128);
+    kbInfo.push(`${title}: ${text}`);
+    truncatedKbInfo += text.split("\n", 1)[0].slice(0, 128);
   }
 
-  await writeFileToTmpDir(dir, "table.json", tables);
-
-  return info;
+  return { truncatedKbInfo, kbInfo };
 };
 
 const constructAlgorithm = async (
-  dir: string,
   instruction: string,
   docs: { title: string; content: string }[],
-): Promise<string> => {
+): Promise<{ truncatedKbInfo: string; kbInfo: string[] }> => {
   console.log("constructTable...");
 
   const systemPrompt = await loadPrompt("construct_algorithm");
-  let info = "";
-  const algorithms: string[] = [];
+  let truncatedKbInfo = "";
+  const kbInfo: string[] = [];
 
   for (const { title, content } of docs) {
     const { text } = await generateText({
@@ -131,26 +122,22 @@ const constructAlgorithm = async (
         "Output:",
     });
 
-    algorithms.push(`${title}: ${text}`);
-    info += text.split("\n", 1)[0].slice(0, 128);
+    kbInfo.push(`${title}: ${text}`);
+    truncatedKbInfo += text.split("\n", 1)[0].slice(0, 128);
   }
 
-  await writeFileToTmpDir(dir, "algorithms.json", algorithms);
-
-  return info;
+  return { truncatedKbInfo, kbInfo };
 };
 
 const constructCatalogue = async (
-  dir: string,
   instruction: string,
   docs: { title: string; content: string }[],
-): Promise<string> => {
+): Promise<{ truncatedKbInfo: string; kbInfo: string[] }> => {
   console.log("constructTable...");
 
   const systemPrompt = await loadPrompt("construct_catalogue");
-  let info = "";
-
-  const catalogues: string[] = [];
+  let truncatedKbInfo = "";
+  const kbInfo: string[] = [];
 
   for (const { title, content } of docs) {
     const { text } = await generateText({
@@ -164,18 +151,28 @@ const constructCatalogue = async (
         "Output:",
     });
 
-    catalogues.push(`${title}: ${text}`);
-    info += text.split("\n", 1)[0].slice(0, 128);
+    kbInfo.push(`${title}: ${text}`);
+    truncatedKbInfo += text.split("\n", 1)[0].slice(0, 128);
   }
 
-  await writeFileToTmpDir(dir, "catalogues.json", catalogues);
-
-  return info;
+  return { truncatedKbInfo, kbInfo };
 };
 
 const constructChunk = async (
   docs: { title: string; content: string }[],
-): Promise<string> => {
+): Promise<{ truncatedKbInfo: string; kbInfo: string[] }> => {
   console.log("constructChunk...");
-  return docs.map((d) => d.title).join(" ");
+
+  let truncatedKbInfo = "";
+  const kbInfo: string[] = [];
+
+  for (const { title, content } of docs) {
+    kbInfo.push(`${title}: ${content}`);
+    truncatedKbInfo += ` ${title}`;
+  }
+
+  return {
+    truncatedKbInfo: truncatedKbInfo.trimStart(),
+    kbInfo,
+  };
 };

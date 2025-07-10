@@ -52,12 +52,12 @@ export async function POST(req: Request) {
         execute: async ({ question }) => {
           try {
             const answer = await getInformationWithStructRAG(question);
-            console.log("the answer: ", answer);
+            console.log("The answer: ", answer);
             return answer;
-          } catch (err) {
-            console.error("StructRAG failed:", err);
+          } catch (error) {
+            console.error(error);
+            return "Sorry, I don't know.";
           }
-          return "Sorry, I don't know.";
         },
       }),
     },

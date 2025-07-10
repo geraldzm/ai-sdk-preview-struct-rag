@@ -1,7 +1,6 @@
 import { openai } from "@ai-sdk/openai";
 import { loadPrompt } from "../prompt-utils";
 import { generateText } from "ai";
-import { readFileFromTmpDir } from "@/lib/file-utils";
 
 export const decompose = async (
   query: string,
@@ -23,35 +22,33 @@ export const decompose = async (
 };
 
 export const extract = async (
-  dir: string,
   subqueries: string[],
   chosen: "table" | "graph" | "algorithm" | "catalogue" | "chunk",
-  docs: { title: string; content: string }[],
+  kbInfo: string[],
 ): Promise<string[]> => {
   console.log("extract");
 
   switch (chosen) {
     case "chunk":
-      return extractChunk(subqueries, docs);
+      return extractChunk(subqueries, kbInfo);
     case "table":
-      return extractTable(dir, subqueries);
+      return extractTable(subqueries, kbInfo);
     case "graph":
-      return extractGraph(dir, subqueries);
+      return extractGraph(subqueries, kbInfo);
     case "algorithm":
-      return extractAlgorithm(dir, subqueries);
+      return extractAlgorithm(subqueries, kbInfo);
     case "catalogue":
-      return extractCatalogue(dir, subqueries);
+      return extractCatalogue(subqueries, kbInfo);
   }
 };
 
 const extractChunk = async (
   subqueries: string[],
-  docs: { title: string; content: string }[],
+  chunks: string[],
 ): Promise<string[]> => {
   const subknowledges: string[] = [];
 
-  for (const doc of docs) {
-    const chunk = `${doc.title}: ${doc.content}`;
+  for (const chunk of chunks) {
     const composedQuery = subqueries.join("\n");
     const prompt = `\n\nQuery:\n${composedQuery}\n\nDocument:\n${chunk}\n\nOutput:`;
 
@@ -62,17 +59,18 @@ const extractChunk = async (
       prompt: prompt,
     });
 
-    subknowledges.push(`Retrieval result for ${doc.title}: ${text}`);
+    // TODO: This split is not reliable since the title itself can contain a ":"
+    const title = chunk.split(":")[0];
+    subknowledges.push(`Retrieval result for ${title}: ${text}`);
   }
 
   return subknowledges;
 };
 
 const extractTable = async (
-  dir: string,
   subqueries: string[],
+  tables: string[],
 ): Promise<string[]> => {
-  const tables: string[] = await readFileFromTmpDir(dir, "table.json");
   let tablesContent = "";
   tables.forEach(
     (table, i) => (tablesContent += `Table ${i + 1}:\n${table}\n\n`),
@@ -83,8 +81,7 @@ const extractTable = async (
     const { text } = await generateText({
       model: openai("gpt-4o"),
       maxTokens: 4096,
-      system:
-        "Instruction:\nThe following Tables show multiple independent tables built from multiple documents.\nFilter these tables according to the query, retaining only the table information that helps answer the query.\nNote that you need to analyze the attributes and entities mentioned in the query and filter accordingly.\nThe information needed to answer the query must exist in one or several tables, and you need to check these tables one by one.",
+      system: "",
       prompt: `\n\nTables:${tablesContent}\n\nQuery:${subquery}\n\nOutput:`,
     });
 
@@ -95,10 +92,9 @@ const extractTable = async (
 };
 
 const extractGraph = async (
-  dir: string,
   subqueries: string[],
+  graphs: string[],
 ): Promise<string[]> => {
-  const graphs: string[] = await readFileFromTmpDir(dir, "graphs.json");
   const graphsContent = graphs.join("\n\n");
 
   const subknowledges: string[] = [];
@@ -118,10 +114,9 @@ const extractGraph = async (
 };
 
 const extractAlgorithm = async (
-  dir: string,
   subqueries: string[],
+  algorithms: string[],
 ): Promise<string[]> => {
-  const algorithms: string[] = await readFileFromTmpDir(dir, "algorithms.json");
   const algorithmsContent = algorithms.join("\n\n");
 
   const subknowledges: string[] = [];
@@ -141,10 +136,9 @@ const extractAlgorithm = async (
 };
 
 const extractCatalogue = async (
-  dir: string,
   subqueries: string[],
+  catalogues: string[],
 ): Promise<string[]> => {
-  const catalogues: string[] = await readFileFromTmpDir(dir, "catalogues.json");
   const cataloguesContent = catalogues.join("\n\n");
 
   const subknowledges: string[] = [];
