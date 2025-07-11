@@ -1,62 +1,42 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { Message } from "ai";
-import { useChat } from "ai/react";
-import { useEffect, useMemo, useState } from "react";
+import { UIMessage } from "ai";
+import { useChat } from "@ai-sdk/react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import ReactMarkdown, { Options } from "react-markdown";
 import React from "react";
 import ProjectOverview from "@/components/project-overview";
-import { LoadingIcon } from "@/components/icons";
+import { ChevronDownIcon, LoadingIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function Chat() {
-  const [toolCall, setToolCall] = useState<string>();
-  const { messages, input, handleInputChange, handleSubmit, isLoading } =
-    useChat({
-      maxSteps: 4,
-      onToolCall({ toolCall }) {
-        setToolCall(toolCall.toolName);
-      },
-      onError: (error) => {
-        toast.error("You've been rate limited, please try again later!");
-      },
-    });
+  const { messages, input, handleInputChange, handleSubmit, status } = useChat({
+    onError: (error) => {
+      console.error(error);
+      toast.error("You've been rate limited, please try again later!");
+    },
+  });
 
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     if (messages.length > 0) setIsExpanded(true);
+
+    console.log("messages", messages.length);
+
+    messages.forEach((message) => {
+      console.log(message.id, message);
+    });
   }, [messages]);
 
-  const currentToolCall = useMemo(() => {
-    const tools = messages?.slice(-1)[0]?.toolInvocations;
-    if (tools && toolCall === tools[0].toolName) {
-      return tools[0].toolName;
-    } else {
-      return undefined;
-    }
-  }, [toolCall, messages]);
-
-  const awaitingResponse = useMemo(() => {
-    if (
-      isLoading &&
-      currentToolCall === undefined &&
-      messages.slice(-1)[0].role === "user"
-    ) {
-      return true;
-    } else {
-      return false;
-    }
-  }, [isLoading, currentToolCall, messages]);
-
-  const userQuery: Message | undefined = messages
+  const lastUserMessage: UIMessage | undefined = messages
     .filter((m) => m.role === "user")
     .slice(-1)[0];
 
-  const lastAssistantMessage: Message | undefined = messages
+  const lastAssistantMessage: UIMessage | undefined = messages
     .filter((m) => m.role !== "user")
     .slice(-1)[0];
 
@@ -88,6 +68,7 @@ export default function Chat() {
                 required
                 value={input}
                 placeholder={"Ask me anything..."}
+                disabled={status !== "ready" && status !== "error"}
                 onChange={handleInputChange}
               />
             </form>
@@ -98,21 +79,15 @@ export default function Chat() {
               className="min-h-fit flex flex-col gap-2"
             >
               <AnimatePresence>
-                {awaitingResponse || currentToolCall ? (
-                  <div className="px-2 min-h-12">
-                    <div className="dark:text-neutral-400 text-neutral-500 text-sm w-fit mb-1">
-                      {userQuery.content}
-                    </div>
-                    <Loading tool={currentToolCall} />
+                <div className="px-2 min-h-12">
+                  <div className="dark:text-neutral-400 text-neutral-500 text-sm w-fit mb-1">
+                    {lastUserMessage?.content}
                   </div>
-                ) : lastAssistantMessage ? (
-                  <div className="px-2 min-h-12">
-                    <div className="dark:text-neutral-400 text-neutral-500 text-sm w-fit mb-1">
-                      {userQuery.content}
-                    </div>
-                    <AssistantMessage message={lastAssistantMessage} />
-                  </div>
-                ) : null}
+                  {status === "streaming" && <Loading />}
+                  {status === "ready" && lastAssistantMessage && (
+                    <Message message={lastAssistantMessage} />
+                  )}
+                </div>
               </AnimatePresence>
             </motion.div>
           </div>
@@ -122,8 +97,23 @@ export default function Chat() {
   );
 }
 
-const AssistantMessage = ({ message }: { message: Message | undefined }) => {
-  if (message === undefined) return "HELLO";
+const Message = ({ message }: { message: UIMessage }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const variants = {
+    collapsed: {
+      height: 0,
+      opacity: 0,
+      marginTop: 0,
+      marginBottom: 0,
+    },
+    expanded: {
+      height: "auto",
+      opacity: 1,
+      marginTop: "1rem",
+      marginBottom: "0.5rem",
+    },
+  };
 
   return (
     <AnimatePresence mode="wait">
@@ -132,27 +122,78 @@ const AssistantMessage = ({ message }: { message: Message | undefined }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="whitespace-pre-wrap font-mono anti text-sm text-neutral-800 dark:text-neutral-200 overflow-hidden"
+        className="flex flex-col gap-3 font-mono anti text-sm text-neutral-800 dark:text-neutral-200"
         id="markdown"
       >
-        <MemoizedReactMarkdown
-          className={"max-h-72 overflow-y-scroll no-scrollbar-gutter"}
-        >
-          {message.content}
-        </MemoizedReactMarkdown>
+        {message.parts?.map((part, index) => {
+          const { type } = part;
+          const key = `message-${message.id}-part-${index}`;
+
+          if (type === "text") {
+            return (
+              <MemoizedReactMarkdown
+                key={key}
+                className={"max-h-72 overflow-y-scroll no-scrollbar-gutter"}
+              >
+                {part.text}
+              </MemoizedReactMarkdown>
+            );
+          }
+
+          if (type === "tool-invocation") {
+            const { toolInvocation } = part;
+
+            if (toolInvocation.state === "result") {
+              return (
+                <div key={toolInvocation.toolCallId}>
+                  <div className="flex flex-row gap-2 items-center">
+                    <div className="font-medium">tool result</div>
+                    <button
+                      data-testid="message-reasoning-toggle"
+                      type="button"
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setIsExpanded(!isExpanded);
+                      }}
+                    >
+                      <ChevronDownIcon />
+                    </button>
+                  </div>
+
+                  <AnimatePresence initial={false}>
+                    {isExpanded && (
+                      <motion.div
+                        data-testid="message-reasoning"
+                        key="content"
+                        initial="collapsed"
+                        animate="expanded"
+                        exit="collapsed"
+                        variants={variants}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        style={{ overflow: "hidden" }}
+                        className="pl-4 text-zinc-600 dark:text-zinc-400 border-l flex flex-col gap-4"
+                      >
+                        <MemoizedReactMarkdown
+                          className={
+                            "max-h-72 overflow-y-scroll no-scrollbar-gutter"
+                          }
+                        >
+                          {toolInvocation.result}
+                        </MemoizedReactMarkdown>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            }
+          }
+        })}
       </motion.div>
     </AnimatePresence>
   );
 };
 
-const Loading = ({ tool }: { tool?: string }) => {
-  const toolName =
-    tool === "getInformation"
-      ? "Getting information"
-      : tool === "addResource"
-        ? "Adding information"
-        : "Thinking";
-
+const Loading = () => {
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -167,7 +208,7 @@ const Loading = ({ tool }: { tool?: string }) => {
             <LoadingIcon />
           </div>
           <div className="text-neutral-500 dark:text-neutral-400 text-sm">
-            {toolName}...
+            Thinking...
           </div>
         </div>
       </motion.div>

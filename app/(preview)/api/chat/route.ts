@@ -14,6 +14,7 @@ export async function POST(req: Request) {
   const result = streamText({
     model: openai("gpt-4o"),
     messages,
+    maxSteps: 4,
     system: `You are a helpful assistant acting as the users' second brain.
     Use tools on every request.
     Be sure to getInformation from your knowledge base before answering any questions.
@@ -51,9 +52,7 @@ export async function POST(req: Request) {
         }),
         execute: async ({ question }) => {
           try {
-            const answer = await getInformationWithStructRAG(question);
-            console.log("The answer: ", answer);
-            return answer;
+            return await getInformationWithStructRAG(question);
           } catch (error) {
             console.error(error);
             return "Sorry, I don't know.";
